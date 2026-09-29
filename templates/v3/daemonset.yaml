@@ -8,5 +8,5 @@ spec:
   selector: {{- include "poly.v3.labelSelector" $ | nindent 4 }}
   template: {{- include "poly.v3.podTemplate" $ | nindent 4 }}
   updateStrategy: {{- include "poly.v3.updateStrategy" $ | nindent 4 }}
-  {{- with $.currentApp.workloadCommonConfigs.daemoset -}}{{- toYaml . | nindent 2 }}{{- end -}}
+  {{- with $.currentApp.workloadCommonConfigs.daemonset -}}{{- toYaml . | nindent 2 }}{{- end -}}
 {{- end -}}
