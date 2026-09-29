@@ -1,0 +1,6 @@
+{{- define "poly.v3.jobSpec" -}}
+template: {{- include "poly.v3.podTemplate" $ | nindent 2 }}
+{{- with $.currentApp.workloadCommonConfigs.job }}
+{{ toYaml . }}
+{{- end -}}
+{{- end -}}

@@ -1,0 +1,23 @@
+{{- define "poly.v3.pvc" }}
+{{- range $pvc := $.currentApp.pvcs }}
+{{- if not $pvc.exists }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvc.name }}
+  labels: {{- include "poly.v3.labels" $ | nindent 4 }}
+  {{- with $pvc.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if hasKey $pvc "storageClassName" }}
+  storageClassName: {{ $pvc.storageClassName | quote }}
+  {{- end }}
+  accessModes: {{ toYaml ($pvc.accessModes | default (list "ReadWriteOnce")) | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ $pvc.size | default "1Gi" }}
+{{ end -}}
+{{ end -}}
+{{- end -}}

@@ -1,0 +1,39 @@
+{{- define "poly.v3.vault.configmap" -}}
+{{- $app := $.currentApp -}}
+{{- $vault := $.currentApp.vault -}}
+{{- if and $app.enabled $vault.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "poly.v3.vault.cfmName" $ }}
+  labels: {{- include "poly.v3.labels" $ | nindent 4 }}
+data:
+  config-init.hcl: |-
+{{- if ($vault.template.contentFull | trimAll "\"" | trimAll "'") }}
+{{ $vault.template.contentFull | indent 4 }}
+{{- else }}
+    "auto_auth" = {
+      "method" = {
+        "config" = { "role" = "{{ $vault.config.role }}" }
+        "type" = "kubernetes"
+        "mount_path" = "{{ $vault.config.authPath }}"
+      }
+      "sink" = {
+        "config" = { "path" = "/home/vault/.token" }
+        "type" = "file"
+      }
+    }
+    "exit_after_auth" = true
+    "pid_file" = "/home/vault/.pid"
+
+    "template" = {
+      "contents" = <<EOF
+      {{- $vault.template.content | nindent 8 }}
+      EOF
+      "destination" = "/vault/secrets/{{ $vault.template.name | trimAll "-" }}"
+    }
+    "vault" = { "address" = "{{ $vault.config.serviceServer }}" }
+{{- end -}}
+{{ end }}
+{{ end }}

@@ -1,0 +1,32 @@
+{{- define "poly.v3.ingress" }}
+{{- $ing := $.currentApp.currentIngress -}}
+{{- if or $ing.enabled $.currentApp.quickConfigs.domain }}
+---
+apiVersion: {{ include "poly.v3.ingress.apiVersion" $ }}
+kind: Ingress
+metadata:
+  name: {{ include "poly.v3.ingressName" $ }}
+  labels: {{- include "poly.v3.labels" $ | nindent 4 }}
+  {{- with $ing.annotations }}
+  annotations:
+    {{- include "poly.v3.tpl-dict" (dict "ctx" $ "dict" .) | indent 4 }}
+  {{- end }}
+spec:
+  {{- if (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version) }}
+  ingressClassName: {{ $ing.className | default "nginx" }}
+  {{- end }}
+  {{- with $ing.tls }}
+  tls: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+  {{- range $host := $ing.hosts }}
+  - host: {{ $host.host | default $.currentApp.quickConfigs.domain }}
+    http:
+      paths:
+        {{- $paths := $host.paths | default (list "/:Prefix") }}
+        {{- range $path := $paths }}
+        {{- include "poly.v3.ingress.path" (dict "ctx" $ "path" $path) | nindent 8 }}
+        {{- end }}
+  {{- end -}}
+{{- end -}}
+{{ end }}

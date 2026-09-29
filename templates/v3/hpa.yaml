@@ -1,0 +1,48 @@
+{{- define "poly.v3.hpa" }}
+{{- $app := $.currentApp -}}
+{{- $hpa := $app.autoscaling -}}
+{{- if and (and $app.enabled $hpa.enabled) (mustHas $app.deployType (list "Deployment" "StatefulSet")) }}
+---
+apiVersion: {{ include "poly.v3.hpa.apiVersion" $ }}
+kind: HorizontalPodAutoscaler
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec:
+  minReplicas: {{ $hpa.minReplicas }}
+  maxReplicas: {{ $hpa.maxReplicas }}
+  scaleTargetRef:
+  {{- if $app.rollout.enabled }}
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+  {{- else }}
+    apiVersion: apps/v1
+    kind: {{ $app.deployType }}
+  {{- end }}
+    name: {{ include "poly.v3.fullname" $ }}
+  {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version }}
+  behavior:
+    scaleDown: {{- include "poly.v3.hpa.scalingRule" $hpa.behavior.scaleDown | nindent 6 }}
+    scaleUp: {{- include "poly.v3.hpa.scalingRule" $hpa.behavior.scaleUp | nindent 6 }}
+  {{- end }}
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version }}
+        target:
+          type: Utilization
+          averageUtilization: {{ $hpa.targetMemoryUtilizationPercentage }}
+        {{- else }}
+        targetAverageUtilization: {{ $hpa.targetMemoryUtilizationPercentage }}
+        {{- end }}
+    - type: Resource
+      resource:
+        name: cpu
+        {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version }}
+        target:
+          type: Utilization
+          averageUtilization: {{ $hpa.targetCPUUtilizationPercentage }}
+        {{- else }}
+        targetAverageUtilization: {{ $hpa.targetCPUUtilizationPercentage }}
+        {{- end }}
+{{- end -}}
+{{- end -}}

@@ -1,0 +1,558 @@
+# These values will be default for your app
+apps: {}
+
+default:
+  # Allow app to be deployed
+  enabled: false
+  nameOverride: ""
+  fullnameOverride: ""
+  appVersion: "1.0.0"
+
+  # [Required] Values: Deployment | StatefulSet | DaemonSet | CronJob | Job | None
+  # If `StatefulSet`, do not set `service.enabled=false`
+  deployType: Deployment
+
+  # Provide extra labels for your app
+  # this will add to labels section of all resources
+  extraLabels: {}
+  extraSelectorLabels: {}
+
+  # Number of replicas, will be used when HPA is disabled
+  replicas: 1
+
+  # Choose update strategy for your app
+  # Values: RollingUpdate | Recreate | OnDelete
+  strategy: RollingUpdate:25%:25%
+
+  quickConfigs:
+    registry: ""
+    domain: ""
+    healthcheckPath: ""
+    port: 80
+
+  workloadCommonConfigs:
+    deployment:
+      revisionHistoryLimit: 0
+      progressDeadlineSeconds: 600
+      # minReadySeconds: 0
+      # paused: false
+    statefulset:
+      revisionHistoryLimit: 0
+      # minReadySeconds: 0
+      # podManagementPolicy: OrderedReady
+      # volumeClaimTemplates: []
+      # persistentVolumeClaimRetentionPolicy:
+      #   whenDeleted: ""
+      #   whenScaled: ""
+      # ordinals:
+      #   start: 0
+    daemonset:
+      revisionHistoryLimit: 0
+      # minReadySeconds: 0
+    cronjob:
+      schedule: '*/10 * * * *'
+      concurrencyPolicy: "Allow"
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
+      # startingDeadlineSeconds: 0
+      # suspend: false
+      # timezone: Asia/Bangkok
+    job:
+      parallelism: 0
+      completions: 0
+      completionMode: NonIndexed
+      backoffLimit: 6
+      activeDeadlineSeconds: 0
+      ttlSecondsAfterFinished: 0
+      suspend: false
+    rollout:
+      analysis:
+        successfulRunHistoryLimit: 5
+        unsuccessfulRunHistoryLimit: 5
+      minReadySeconds: 30
+      revisionHistoryLimit: 3
+      pause: true
+      progressDeadlineSeconds: 600
+      progressDeadlineAbort: false
+      # rollbackWindow:
+      #   revisions: 3
+
+  rollout:
+    enabled: false
+    dynamicConfigMap:
+      enabled: false
+      analysisTemplateName: -rollout-update-cm
+    # More info: https://argoproj.github.io/argo-rollouts/features/specification/
+    strategy:
+      blueGreen:
+        previewReplicaCount: 1
+        autoPromotionEnabled: false
+        autoPromotionSeconds: 30
+        scaleDownDelaySeconds: 30
+        scaleDownDelayRevisionLimit: 2
+        abortScaleDownDelaySeconds: 30
+        # antiAffinity: {}
+        # prePromotionAnalysis: {}
+        # postPromotionAnalysis: {}
+        # activeMetadata: {}
+        # previewMetadata: {}
+
+    # Like app service config, if not set, app service config will be used
+    servicePreview:
+      enabled: true
+      name: "rollout-svc-preview"
+    ingressPreview:
+      enabled: true
+      name: -preview
+      annotations:
+        nginx.ingress.kubernetes.io/configuration-snippet: |
+          rewrite "(?i)/preview(/|$)(.*)" /$2 break;
+      hosts:
+        - host: ""
+          paths:
+            - /preview/:Prefix:rollout-svc-preview
+      tls: []
+
+  # Provide image config for your app
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#image
+  image:
+    repository: ""
+    tag: "latest"
+    # Values: IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent
+    # Provide your image pull secrets, format in example below
+    imagePullSecrets:
+      - name: regcred
+
+# --------------------------------- POD ----------------------------------- #
+  podAnnotations: {}
+    # prometheus.io/scrape: 'true'
+    # prometheus.io/port: '80'
+
+  # Provide your app `hostAliases`, format in example below
+  hostAliases: []
+    # - ip: "192.168.8.103"
+    #   hostnames:
+    #     - "mysql"
+    #     - "redis"
+
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#volumes
+  volumes: []
+    # - name: nginx-pv
+    #   persistentVolumeClaim:
+    #     claimName: nginx-pv
+
+  # Pod scheduling config
+  # More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#scheduling
+  schedule:
+    nodeSelector: {}
+      # disktype: ssd
+    affinity: {}
+      # nodeAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #     nodeSelectorTerms:
+      #     - matchExpressions:
+      #       - key: topology.kubernetes.io/zone
+      #         operator: In
+      #         values:
+      #         - antarctica-east1
+      #         - antarctica-west1
+
+    # More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+    tolerations: []
+    # - key: "key1"
+    #   operator: "Equal"
+    #   value: "value1"
+    #   effect: "NoSchedule"
+
+  # Provide Pod lifecycle config
+  # More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#lifecycle
+  podLifecycle: {}
+    # restartPolicy: "Always"
+    # terminationGracePeriodSeconds: 30
+    # activeDeadlineSeconds: 10
+  
+  podExtraConfigs: {}
+
+# --------------------------------- CONTAINER ----------------------------------- #
+  containerName: ""
+  # Provide port to expose for your app
+  # More info: 
+    # - containerPort: 80 # required
+    #   name: http # must be unique, optional
+    #   protocol: TCP # default is TCP
+  ports: []
+    # - 80:http:TCP
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#entrypoint-1
+  command: []
+  runtimeArgs: []
+
+  # Provide env variable for your app, format in example below
+  env: {}
+    # KEY: value
+    # KEY_FROM_CFM: cfm:key:cfm-name:true
+    # KEY_FROM_SCR: scr:key:scr-name:false
+    # KEY_FROM_FR: fr:fieldPath:api-version
+    # KEY_FROM_RFR: rfr:resource:containerName:divisor
+
+  envFrom: []
+    # - configMapRef:
+    #     name: "{{ .Release.Name }}-main"
+    #     optional: true
+    # - secretRef:
+    #     name: "{{ .Release.Name }}-env"
+    #     optional: false
+
+  # More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#lifecycle-1
+  #     httpGet:
+  #       request: /:http
+  #       httpHeaders:
+  #         - name: Content-Type
+  #           value: application/json
+  #     execCommand: ["sleep", "30"]
+  #     tcpSocket: host:8080
+  #
+  #     params: "15:15:10:30:1" # initialDelaySeconds:periodSeconds:timeoutSeconds:failureThreshold:successThreshold
+  #     grpc:
+  #       port: 8080
+  #       service: service-name
+  probes:
+    livenessProbe:
+      httpGet:
+        request: /:http
+      params: "15:15:10:30:1"
+    readinessProbe:
+      httpGet:
+        request: /:http
+      params: "15::10::1"
+    startupProbe:
+      httpGet:
+        request: /:http
+      params: "::::"
+  probesOverride: {}
+
+  # More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#lifecycle-1
+  lifecycle:
+    postStart: {}
+      # execCommand: []
+      # httpGet:
+      #   request: /:8080
+      #   httpHeaders:
+      #     - name:
+      #       value: 
+      # tcpSocket: host:8080
+    preStop:
+      execCommand: ["sleep", "30"]
+  lifecycleOverride: {}
+
+  # Provide resources, format in example below, must have
+  # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources
+  resources: {}
+    # limits:
+    #   cpu: 256m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 256Mi
+
+  # Provide volumeMounts, format in example below
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#volumes-1
+  volumeMounts: []
+    # - name: nginx-pv
+    #   mountPath: /usr/share/nginx/html
+    #
+    # - nginx-pv:/usr/share/nginx/html:true:subPath:mountPropagation
+  customVolumeMounts: []
+  extraContainerConfigs: {}
+  ephemeralContainers: []
+  extraContainers: []
+
+# --------------------------------- INIT CONTAINER ----------------------------------- #
+  initContainer:
+    enabled: false
+    containerName: ""
+    quickConfigs:
+      registry: ""
+      port: 80
+    image:
+      repository: ""
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    ports: []
+      # - 80:http:TCP
+    command: []
+      # - "/bin/sh"
+      # - "-c"
+    runtimeArgs: []
+      # - echo 1
+    env: {}
+      # KEY: value
+      # KEY_FROM_CFM: cfm:key:cfm-name:true               # env from configMapKeyRef
+      # KEY_FROM_SCR: scr:key:scr-name:false              # env from secretKeyRef
+      # KEY_FROM_FR: fr:fieldPath:api-version             # env from fieldRef
+      # KEY_FROM_RFR: rfr:resource:containerName:divisor  # env from resourceFieldRef
+    envFrom: []
+    resources: {}
+    volumeMounts: []
+      # - name: nginx-pv
+      #   mountPath: /usr/share/nginx/html
+      #
+      # - nginx-pv:/usr/share/nginx/html:true:subPath:mountPropagation
+    vault:
+      enabled: false
+  extraInitContainers: []
+
+# --------------------------------- SA ----------------------------------- #
+  # Service account config
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/service-account-v1/#ServiceAccount
+  serviceAccount:
+    # Provide existing sa name
+    existingServiceAccount: ""
+    # If not, create new one
+    create: false
+    name: ""
+    annotations: {}
+    # More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#use-the-default-service-account-to-access-the-api-server
+    automountServiceAccountToken: true
+
+  # Service config
+  # More info: https://kubernetes.io/docs/concepts/services-networking/service/
+  # API: https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/
+  service:
+    enabled: true
+    name: ""
+
+    # More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+    # Values: ClusterIP | NodePort | LoadBalancer | ExternalName | none
+    # If `none`, this will be headless service with `clusterIP: None`
+    type: ClusterIP
+
+    # API: https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/#ServiceSpec
+    # Caution: first port number will be used in ingress
+    #
+    #   Provide list of string with format: `port:targetPort:protocol:name:nodePort` (port is required)
+    #
+    #   port: Port will be exposed by sevice
+    #   targetPort: Port which is exposed by pod, can be the name of port (if any) or port number, default `port value`
+    #   protocol: Values: "TCP", "UDP", and "SCTP"
+    #   name:  Provide service port name, unique, optional if only one service port is defined on this service 
+    #   nodePort: Each node proxies that port into Service . allocates a port from a range specified 30000-32767
+    ports: []
+    # - 8080:8080:TCP:http
+    # - 8080:8080:TCP:http:30001 # With type NodePort
+    selector: {}
+      # foo: bar
+    extraServices: []
+
+  # Ingress config
+  # More info: https://kubernetes.io/docs/concepts/services-networking/ingress/
+  ingress:
+    enabled: false
+    name: ""
+    # Provide ingress class name, only available for k8s version >= 1.18-0
+    # Can use annotation instead
+    className: "nginx"
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+      # nginx.ingress.kubernetes.io/proxy-body-size: 1000m
+
+    # Ingress hosts config
+    hosts:
+      - host: "" # host: "chart-example.local"
+        #   Provide list of string with format: `path:pathType:serviceName:servicePort`
+        #
+        #   If `serviceName` & `servicePort` are not specified, it will take default svc name and its first port automatically
+        #   pathType: Values: ImplementationSpecific | Exact | Prefix (default: Prefix). # More info: https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
+        paths:
+          - /:Prefix
+    tls: []
+      # - secretName: chart-example-tls
+      #   hosts:
+      #     - chart-example.local
+    extraIngresses: []
+
+  # Persistent Volume Claim (PVC) config
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/
+  pvcs: []
+    # - name: ""
+    #   size: 1Gi
+    #   mountPath: ""
+    #   exists: false
+    #   annotations: {}
+    #     # helm.sh/resource-policy: "keep"
+
+    #   # # More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes-1
+    #   accessModes:
+    #     - ReadWriteOnce
+    #     # - ReadOnlyMany
+
+    #   # More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
+    #   # storageClassName: ""
+
+  # Horizontal Pod Autoscaler (HPA) config
+  # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/horizontal-pod-autoscaler-v2beta2/
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+
+    # Target CPU & memory utilization, it will use for triggering sale up
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+    # Behavior of scaling, available in `apiVerison` >= autoscaling/v2beta2
+    # More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/horizontal-pod-autoscaler-v2beta2/#HorizontalPodAutoscalerSpec
+    behavior:
+      scaleDown:
+        # Scale down delay time (in seconds) for stability
+        # More info: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#stabilization-window
+        stabilizationWindowSeconds: 300
+        # More info: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#scaling-policies
+        policies: []
+        # - type: Percent
+        #   value: 100
+        #   periodSeconds: 15
+
+        # Provide scale down policy direction
+        # Values: Max | Min | Disable
+        selectPolicy: Max
+      
+      # Define scaleUp, config like scaleDown
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies: []
+        selectPolicy: Max
+
+  # ConfigMap config
+  configMaps:
+  - name: main
+    create: false
+    # Provide configmap fullname, the fixed name with highest priority, must be unique, optional
+    fullName: ""
+    # Is this configmap type file-config? If true, use second `data` format below
+    isFileType: false
+
+    # Provide data for normal configmap, optional
+    #
+    # data:
+    #   KEY: "value"
+
+    # Provide data for file-config configmap, optional
+    # data:
+    #   hello.txt: |
+    #     hello-world-1
+    #     hello-world-2
+    #     ...
+
+  # Enable vault for your app
+  #
+  vault:
+    enabled: false
+
+    # These value are only required when `template.type = annotation`
+    config:
+      path: "secret/data/abc" # vault secret path
+      authPath: "auth/kubernetes" # vault authPath
+      role: "abc-ro"
+      namespace: ""
+
+      # Provide vault internalCaCert to verify Vault's TLS
+      internalCaCert: ""
+      # More info: https://www.vaultproject.io/docs/platform/k8s/injector/annotations#vault-hashicorp-com-service
+      serviceServer: "https://vault-raft.prod.ftech.ai"
+
+    template:
+      # Choose vault config type, required, case sensitive
+      # Values: annotation | configmap
+      type: annotation
+      name: application.yml
+
+      # Provide vault template content, required
+      content: |-
+        ""
+      contentFull: |-
+        ""
+      extraTemplates: []
+        # - name: config.env
+        #   secretPath: abcpath/dev   default vault.config.path
+        #   content: |
+        #     ""
+    runContainer:
+      command: ["/bin/sh", "-c"]
+      runtimeArgs: [". /vault/secrets/config.env && yarn start"]
+    injectorLables: {}
+      # sidecar-injector: enabled
+      # vault-sidecar-injector-raft: enabled
+      
+  serviceMonitor:
+    enabled: false
+
+    # Extra endpoint config: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#endpoint
+    endpoints:
+      - port: http # Name of the service port this endpoint refers to
+        path: /metrics # HTTP path to scrape for metrics
+        interval: 30s
+
+    # More info: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitorspec
+    extraConfig: {}
+
+# --------------------------------- PodDisruptionBudget ----------------------------------- #
+  # Enable PodDisruptionBudget for your app
+  #
+  pdb:
+    enabled: true
+    name: "" 
+    minAvailable: ""
+    selector: {}
+
+    extraPdb: []
+      # - name: ""
+      #   enabled: true
+      #   minAvailable: ""
+      #   selector: {}
+
+# --------------------------------- IstioIngress ----------------------------------- #
+  # Enable IstioIngress for your app
+  ## Ref manifest
+  #### gateway:         https://istio.io/latest/docs/reference/config/networking/gateway/
+  #### virtualservice:  https://istio.io/latest/docs/reference/config/networking/virtual-service/
+  istio:
+    gateway:
+      enabled: false
+      name: "" # project-gateway
+      selector: {}
+        # app: istio-gateway-controller
+      servers: []
+        # - hosts:
+        #     - '*'
+        #   port:
+        #     name: http
+        #     number: 80
+        #     protocol: HTTP
+      extraLabels: {}
+      extraGW: []
+
+    virtualservice:
+      enabled: false
+      name: ""
+      gateways: []
+        # - project-gateway
+      hosts: []
+        # - abc.ftech.ai
+      http: []
+        # - match:
+        #   - uri:
+        #       prefix: "/"
+        #   route:
+        #   - destination:
+        #       host: reviews # interpreted as reviews.foo.svc.cluster.local
+        #       port:
+        #         number: 9080
+      extraLabels: {}
+      extraVS: []

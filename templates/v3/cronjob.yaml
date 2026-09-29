@@ -1,0 +1,12 @@
+{{- define "poly.v3.cronjob" }}
+{{- $app := $.currentApp }}
+---
+apiVersion: {{ include "poly.v3.cj.apiVersion" $ }}
+kind: CronJob
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec:
+  {{- with $.currentApp.workloadCommonConfigs.cronjob -}}{{- toYaml . | nindent 2 }}{{- end }}
+  jobTemplate:
+    metadata: {{- include "poly.v3.commonMetadata" $ | nindent 6 }}
+    spec: {{- include "poly.v3.jobSpec" $ | nindent 6 }}
+{{- end -}}

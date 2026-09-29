@@ -1,0 +1,21 @@
+{{- define "poly.v3.gateway" }}
+{{- $gw := $.currentApp.currentGateway -}}
+{{- if $gw.enabled }}
+---
+apiVersion: {{ include "poly.v3.istio.apiVersion" $ }}
+kind: Gateway
+metadata:
+  name: {{ $gw.name | default (include "poly.v3.fullname" $) }}
+  labels: {{ include "poly.v3.labels" $ | nindent 4 }} 
+  {{- with $gw.extraLabels }}
+  {{ toYaml $gw.extraLabels | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $gw.selector }}
+  selector: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $gw.servers }}
+  servers: {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end -}}
+{{ end }}

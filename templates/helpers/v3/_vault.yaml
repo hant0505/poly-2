@@ -1,0 +1,39 @@
+{{/*
+Render vault annotations
+*/}}
+{{- define "poly.v3.vault.annotations" }}
+{{- $vault := $.currentApp.vault -}}
+{{- if $vault.enabled -}}
+vault.hashicorp.com/agent-inject: "true"
+vault.hashicorp.com/agent-init-first: 'true'
+vault.hashicorp.com/agent-pre-populate-only: "true"
+vault.hashicorp.com/auth-path: {{ $vault.config.authPath | quote }}
+vault.hashicorp.com/role: {{ $vault.config.role | quote }}
+vault.hashicorp.com/service: {{ $vault.config.serviceServer | quote }}
+{{- with $vault.config.internalCaCert }}
+vault.hashicorp.com/ca-cert: {{ . | quote }}
+{{- end }}
+{{- with $vault.config.namespace }}
+vault.hashicorp.com/namespace: {{ . | quote }}
+{{- end }}
+{{- if eq $vault.template.type "annotation" }}
+{{ printf "vault.hashicorp.com/agent-inject-secret-%s" $vault.template.name }}: {{ $vault.config.path | quote }}
+{{ printf "vault.hashicorp.com/agent-inject-template-%s" $vault.template.name }}: |
+{{ trim $vault.template.content | indent 2 }}
+{{- else }}
+vault.hashicorp.com/agent-configmap: {{ include "poly.v3.vault.cfmName" $ }}
+{{- end -}}
+{{- range $temp := $vault.template.extraTemplates }}
+{{- if eq $vault.template.type "annotation" }}
+{{ printf "vault.hashicorp.com/agent-inject-secret-%s" $temp.name }}: {{ $temp.secretPath | default $vault.config.path | quote }}
+{{ printf "vault.hashicorp.com/agent-inject-template-%s" $temp.name }}: |
+{{ trim $temp.content | indent 2 }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "poly.v3.vault.cfmName" -}}
+{{- $name := $.currentApp.vault.template.name | replace "." "-" -}}
+{{- ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) -}}
+{{- end -}}

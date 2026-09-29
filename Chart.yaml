@@ -1,0 +1,9 @@
+apiVersion: v2
+appVersion: 1.0.0
+description: A Helm chart for deploying multi-app
+maintainers:
+- email: ptrong1099@gmail.com
+  name: TrongPT
+name: poly
+type: application
+version: 3.0.3

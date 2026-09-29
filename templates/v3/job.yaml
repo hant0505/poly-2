@@ -1,0 +1,7 @@
+{{- define "poly.v3.job" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec: {{- include "poly.v3.jobSpec" $ | nindent 2 }}
+{{- end -}}

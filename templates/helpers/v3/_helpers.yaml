@@ -1,0 +1,244 @@
+
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "poly.v3.name" -}}
+{{- $app := $.currentApp -}}
+{{- $.nameOverride | default $app.name | default .Chart.Name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "poly.v3.fullname" -}}
+{{- $app := $.currentApp -}}
+{{- if $app.fullnameOverride }}
+{{- $app.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := (include "poly.v3.name" $) }}
+{{- if contains $name $.Release.Name }}
+{{- $.Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" $.Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "poly.v3.labels" -}}
+{{- $app := $.currentApp -}}
+helm.sh/chart: {{ printf "poly-%s" $.Chart.Version }}
+{{- include "poly.v3.tpl-dict" (dict "ctx" $ "dict" $app.extraLabels ) }}
+{{ include "poly.v3.selectorLabels" $ }}
+app.kubernetes.io/version: {{ $app.appVersion | default $.Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ $.Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "poly.v3.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "poly.v3.name" $ }}
+app.kubernetes.io/instance: {{ $.Release.Name }}
+{{- include "poly.v3.tpl-dict" (dict "ctx" $ "dict" $.currentApp.extraSelectorLabels ) -}}
+{{- end }}
+
+{{/*
+Parse to key-value list in YAML format
+*/}}
+{{- define "poly.v3.env" }}
+{{- range $key, $value := . }}
+- name: {{ $key | upper | quote }}
+  value: {{ $value | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
+Render key-value datatype, also support value as template
+*/}}
+{{- define "poly.v3.tpl-dict" -}}
+{{- $ctx := get . "ctx" -}}
+{{- $dict := get . "dict" -}}
+{{- range $key, $val := $dict }}
+{{ $key }}: {{ tpl $val $ctx | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Render probes in pod template for healthcheck
+*/}}
+{{- define "poly.v3.probes" }}
+{{- if not (mustHas "all" .disableProbes) -}}
+{{- if not (mustHas "livenessProbe" .disableProbes) }}
+livenessProbe: {{ toYaml .livenessProbe | nindent 2 }}
+{{- end }}
+{{- if not (mustHas "readinessProbe" .disableProbes) }}
+readinessProbe: {{ toYaml .readinessProbe | nindent 2 }}
+{{- end }}
+{{- if not (mustHas "startupProbe" .disableProbes) }}
+startupProbe: {{ toYaml .startupProbe | nindent 2 }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Render container lifecycle hooks in pod template
+*/}}
+{{- define "poly.v3.lifecycleHooks" }}
+{{- if not (or (mustHas "all" .disableHandlers) (and (mustHas "postStart" .disableHandlers) (mustHas "preStop" .disableHandlers))) -}}
+lifecycle:
+{{- if not (mustHas "postStart" .disableHandlers ) }}
+  postStart: {{ toYaml .postStart | nindent 4 }}
+{{- end }}
+{{- if not (mustHas "preStop" .disableHandlers ) }}
+  preStop: {{ toYaml .preStop | nindent 4 }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+
+{{/* ########## Render API Version ########## */}}
+
+{{/* HPA */}}
+{{- define "poly.v3.hpa.apiVersion" }}
+{{- if semverCompare "<1.18-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "autoscaling/v2beta1" -}}
+{{- else if semverCompare "<1.23-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "autoscaling/v2beta2" -}}
+{{- else -}}
+{{- print "autoscaling/v2" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* CronJob */}}
+{{- define "poly.v3.cj.apiVersion" }}
+{{- if semverCompare "<1.21-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "batch/v1beta1" -}}
+{{- else -}}
+{{- print "batch/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Ingress */}}
+{{- define "poly.v3.ingress.apiVersion" }}
+{{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "networking.k8s.io/v1" -}}
+{{- else if semverCompare ">=1.14-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "networking.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "extensions/v1beta1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Istio */}}
+{{- define "poly.v3.istio.apiVersion" }}
+{{- if semverCompare ">=1.27-0" $.Capabilities.KubeVersion.Version -}}
+{{- print "networking.istio.io/v1" -}}
+{{- else -}}
+{{- print "networking.istio.io/v1beta1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* ########## Common parts ########## */}}
+
+{{/* Render common metadata for K8s resources */}}
+{{- define "poly.v3.commonMetadata" -}}
+name: {{ include "poly.v3.fullname" $ }}
+labels: {{- include "poly.v3.labels" $ | nindent 2 }}
+{{- end -}}
+
+{{/* Render updateStrategy for Depolyment & DaemonSet */}}
+{{- define "poly.v3.updateStrategy" -}}
+{{- $params := concat (without (mustRegexSplit ":" $.currentApp.strategy -1) "\"\"" "''") (list "" "") -}}
+type: {{ first $params }}
+rollingUpdate:
+  maxSurge: {{ index $params 1 | default "25%" }}
+  maxUnavailable: {{ index $params 2 | default "25%" }}
+{{- end -}}
+
+{{/*
+Render labelSelector section.
+In future, it can have `matchExpressions` type
+*/}}
+{{- define "poly.v3.labelSelector" -}}
+matchLabels: {{- include "poly.v3.selectorLabels" $ | nindent 2 }}
+{{- end -}}
+
+{{/* Render hpa.scalingRule section. */}}
+{{- define "poly.v3.hpa.scalingRule" -}}
+selectPolicy: {{ .selectPolicy }}
+stabilizationWindowSeconds: {{ .stabilizationWindowSeconds }}
+{{- with .policies }}
+policies: {{ toYaml . | nindent 2 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Render svc.port section.
+*/}}
+{{- define "poly.v3.svc.port" -}}
+{{- $port := get . "port" -}}
+{{- $type := get . "type" -}}
+{{- $params := concat (without (mustRegexSplit ":" ($port | toString) -1) "\"\"" "''") (list "" "" "") -}}
+- port: {{ first $params }}
+  targetPort: {{ index $params 1 | default (first $params) }}
+  protocol: {{ index $params 2 | default "TCP" }}
+  {{- if index $params 3 }}
+  name: {{ index $params 3 }}
+  {{- end -}}
+  {{- if and (eq $type "NodePort") (index $params 4) }}
+  nodePort: {{ index $params 4 }}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Render ingress.path section.
+*/}}
+{{- define "poly.v3.ingress.path" -}}
+{{- $root := get . "ctx" -}}
+{{- $path := get . "path" -}}
+{{- $params := concat (without (mustRegexSplit ":" ($path | toString) -1) "\"\"" "''") (list "" "") -}}
+{{- $svcName := index $params 2 | default (include "poly.v3.fullname" $root) -}}
+{{- $svcPort := index $params 3 | default (first (mustRegexSplit ":" ((first $root.currentApp.service.ports | default "") | toString) -1)) | default $root.currentApp.quickConfigs.port -}}
+- path: {{ first $params }}
+  {{- if semverCompare ">=1.18-0" $root.Capabilities.KubeVersion.Version }}
+  pathType: {{ index $params 1 | default "Prefix" }}
+  {{- end }}
+  backend:
+    {{- if semverCompare ">=1.19-0" $root.Capabilities.KubeVersion.Version }}
+    service:
+      name: {{ $svcName }}
+      port:
+        number: {{ $svcPort }}
+    {{- else }}
+    serviceName: {{ $svcName }}
+    servicePort: {{ $svcPort }}
+    {{- end -}}
+{{- end -}}
+
+{{/* ########## Render resource name ########## */}}
+
+{{/* ServiceAccount */}}
+{{- define "poly.v3.serviceAccountName" -}}
+{{- $sa := $.currentApp.serviceAccount -}}
+{{- if and $sa.create (not $sa.existingServiceAccount) }}
+{{- default (include "poly.v3.fullname" $) $sa.name }}
+{{- else }}
+{{- default "default" $sa.existingServiceAccount }}
+{{- end }}
+{{- end }}
+
+{{/* Ingress */}}
+{{- define "poly.v3.ingressName" -}}
+{{- $app := $.currentApp -}}
+{{- $ing := $app.currentIngress -}}
+{{- $ing.name | default $app.quickConfigs.domain | default (first $ing.hosts).host | default (include "poly.v3.fullname" $) -}}
+{{- end }}
+
+{{- define "poly.v3.prefixName" }}
+{{- $name := get . "prefixName" -}}
+{{- ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) -}}
+{{- end -}}

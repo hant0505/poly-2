@@ -1,0 +1,15 @@
+{{- define "poly.v3.deployment" }}
+{{- $app := $.currentApp }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec:
+  selector: {{- include "poly.v3.labelSelector" $ | nindent 4 }}
+  template: {{- include "poly.v3.podTemplate" $ | nindent 4 }}
+  {{- if not $app.autoscaling.enabled }}
+  replicas: {{ if $app.rollout.enabled }}{{ 0 }}{{ else }}{{ $app.replicas }}{{ end }}
+  {{- end }}
+  strategy: {{- include "poly.v3.updateStrategy" $ | nindent 4 }}
+  {{- with $.currentApp.workloadCommonConfigs.deployment -}}{{- toYaml . | nindent 2 }}{{- end -}}
+{{- end -}}

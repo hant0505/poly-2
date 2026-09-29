@@ -1,0 +1,45 @@
+{{- define "poly.v3.rollout" -}}
+{{- $app := $.currentApp -}}
+{{- $rollout := $app.rollout -}}
+{{- if and $app.enabled $rollout.enabled -}}
+{{- $blueGreen := $app.rollout.strategy.blueGreen }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec:
+  {{- if not $app.autoscaling.enabled }}
+  replicas: {{ $app.replicas }}
+  {{- end }}
+  selector: {{- include "poly.v3.labelSelector" $ | nindent 4 }}
+  workloadRef:
+    apiVersion: apps/v1
+    kind: {{ $app.deployType }}
+    name: {{ include "poly.v3.fullname" $ }}
+  strategy:
+    blueGreen:
+      activeService: {{ include "poly.v3.fullname" $ }}
+      previewService: {{ $rollout.servicePreview.name }}
+    {{- if and $rollout.dynamicConfigMap.enabled (not $blueGreen.postPromotionAnalysis) }}
+      postPromotionAnalysis:
+        templates:
+        {{- $_ := set $ "prefixName" $rollout.dynamicConfigMap.analysisTemplateName -}}
+        - templateName: {{ include "poly.v3.prefixName" $ }}
+    {{- end }}
+    {{- toYaml $blueGreen | nindent 6 }}
+  {{- with $.currentApp.workloadCommonConfigs.rollout -}}{{- toYaml . | nindent 2 }}{{- end -}}
+
+{{- if $rollout.servicePreview.enabled }}
+---
+{{- $_ := set $.currentApp "currentSvc" $rollout.servicePreview -}}
+{{- include "poly.v3.service" $ -}}
+{{- end -}}
+{{- if $rollout.ingressPreview.enabled }}
+---
+{{- $_ := set $.currentApp "currentIngress" $rollout.ingressPreview -}}
+{{- $ingName := $app.quickConfigs.domain | default (first $rollout.ingressPreview.hosts).host | default (include "poly.v3.fullname" $) -}}
+{{- $_ := set $.currentApp.currentIngress "name" (printf "%s%s" $ingName $rollout.ingressPreview.name) -}}
+{{- include "poly.v3.ingress" $ -}}
+{{- end -}}
+{{- end }}
+{{ end }}

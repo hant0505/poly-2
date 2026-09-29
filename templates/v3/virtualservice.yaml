@@ -1,0 +1,24 @@
+{{- define "poly.v3.virtualservice" }}
+{{- $vs := $.currentApp.currentVS -}}
+{{- if $vs.enabled }}
+---
+apiVersion: {{ include "poly.v3.istio.apiVersion" $ }}
+kind: VirtualService
+metadata:
+  name: {{ $vs.name | default (include "poly.v3.fullname" $) }}
+  labels: {{ include "poly.v3.labels" $ | nindent 4 }} 
+  {{- with $vs.extraLabels }}
+  {{ toYaml $vs.extraLabels | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $vs.gateways }}
+  gateways: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $vs.hosts }}
+  hosts: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $vs.http }}
+  http: {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end -}}
+{{ end }}

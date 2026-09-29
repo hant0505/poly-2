@@ -1,0 +1,18 @@
+{{- define "poly.v3.servicemonitor" -}}
+{{- $app := $.currentApp -}}
+{{- $sm := $app.serviceMonitor -}}
+{{- if and $app.enabled $sm.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+spec:
+  {{- with $sm.endpoints }}
+  endpoints: {{ toYaml . | nindent 4 }}
+  {{- end }}
+  selector: {{- include "poly.v3.labelSelector" $ | nindent 4 }}
+  {{- with $sm.extraConfig }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}
+{{ end }}

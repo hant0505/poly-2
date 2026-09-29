@@ -1,0 +1,26 @@
+{{- define "poly.v3.pdb" }}
+
+{{- $pdb := $.currentApp.currentPdb -}}
+{{- if and $.currentApp.enabled $pdb.enabled }}
+---
+{{- if semverCompare ">=1.21-0" $.Capabilities.KubeVersion.Version -}}
+apiVersion: policy/v1
+{{- else }}
+apiVersion: policy/v1beta1
+{{- end }}
+kind: PodDisruptionBudget
+metadata:
+  {{- $name := $pdb.name | default (include "poly.v3.fullname" $) }}
+  name: {{ ternary (printf "%s%s" (include "poly.v3.fullname" $) $name) $name (hasPrefix "-" $name) }}
+  labels: {{- include "poly.v3.labels" $ | nindent 4 }}
+spec:
+  minAvailable: {{ $pdb.minAvailable | default 1 }}
+  selector: 
+    matchLabels:
+    {{- if $pdb.selector -}}
+    {{- toYaml $pdb.selector | nindent 6 }}
+    {{- else -}}
+    {{- include "poly.v3.selectorLabels" $ | nindent 6 }}
+    {{- end -}}
+{{ end -}}
+{{- end -}}

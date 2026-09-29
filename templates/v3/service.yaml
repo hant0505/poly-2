@@ -1,0 +1,28 @@
+{{- define "poly.v3.service" }}
+{{- $svc := $.currentApp.currentSvc -}}
+{{- if and $.currentApp.enabled $svc.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  {{- $name := $svc.name | default (include "poly.v3.fullname" $) }}
+  name: {{ ternary (printf "%s%s" (include "poly.v3.fullname" $) $name) $name (hasPrefix "-" $name) }}
+  labels: {{- include "poly.v3.labels" $ | nindent 4 }}
+spec:
+  {{- if eq $svc.type "none" }}
+  clusterIP: None
+  {{- else }}
+  type: {{ $svc.type | default "ClusterIP" }}
+  {{- end }}
+  ports:
+    {{- range $port := ($svc.ports | default (list $.currentApp.quickConfigs.port)) }}
+    {{- include "poly.v3.svc.port" (dict "port" $port "type" $svc.type ) | nindent 4 }}
+    {{- end }}
+  selector: 
+  {{- if $svc.selector -}}
+  {{- toYaml $svc.selector | nindent 4 }}
+  {{- else -}}
+  {{- include "poly.v3.selectorLabels" $ | nindent 4 }}
+  {{- end -}}
+{{ end -}}
+{{- end -}}

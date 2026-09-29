@@ -1,0 +1,299 @@
+{{- define "poly.v3.podTemplate" }}
+{{- $app := $.currentApp -}}
+metadata: {{- include "poly.v3.commonMetadata" $ | nindent 2 }}
+{{- with $app.vault.injectorLables }}
+{{- toYaml . | nindent 4 }}
+{{- end -}}
+{{- with mustMerge (fromYaml (include "poly.v3.vault.annotations" $)) $app.podAnnotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+{{- end }}
+spec:
+  containers: {{- toYaml (list (fromYaml (include "poly.v3.container" (dict "ctx" $ "appContainer" $app )))) | nindent 4 }}
+  {{- range $container := $app.extraContainers }}
+  {{- toYaml (list $container) | nindent 4 }}
+  {{- end }}
+  {{- with $app.ephemeralContainers }}
+  {{- toYaml . | nindent 2 -}}
+  {{- end }}
+  {{- if $app.initContainer.enabled }}
+  initContainers: {{- toYaml (list (fromYaml (include "poly.v3.container" (dict "ctx" $ "appContainer" $app.initContainer "mode" "init")))) | nindent 4 }}
+  {{- end }}
+  {{- range $initContainer := $app.extraInitContainers }}
+  {{- toYaml (list $initContainer) | nindent 4 }}
+  {{- end }}
+  imagePullSecrets: {{ toYaml $app.image.imagePullSecrets | default list | nindent 4 }}
+  hostAliases: {{ toYaml $app.hostAliases | nindent 4 }}
+  {{- $volumes := (include "poly.v3.pod.volumes" $) -}}
+  {{- with $volumes }}
+  volumes: {{- . | nindent 2 }}
+  {{- end -}}
+  {{- with $.currentApp.schedule }}
+  {{- include "poly.v3.pod.schedule" $ | nindent 2 -}}
+  {{- end -}}
+  {{- with $app.podLifecycle -}}{{- toYaml . | nindent 2 }}{{- end }}
+  serviceAccountName: {{ include "poly.v3.serviceAccountName" $ }}
+  automountServiceAccountToken: {{ $app.serviceAccount.automountServiceAccountToken }}
+  {{- with $app.podExtraConfigs }}
+  {{- toYaml . | nindent 2 }}
+  {{- end -}}
+{{- end -}}
+
+{{- define "poly.v3.pod.schedule" -}}
+{{- toYaml $.currentApp.schedule -}}
+{{- end }}
+
+{{- define "poly.v3.pod.volumes" -}}
+{{- with $.currentApp.volumes }}
+{{- toYaml . }}
+{{- end -}}
+{{- range $pvc := $.currentApp.pvcs }}
+{{- if $pvc.mountPath -}}
+- name: {{ $pvc.name }}
+  persistentVolumeClaim:
+    claimName: {{ $pvc.name }}
+{{- end -}}
+{{ end -}}
+{{- end -}}
+
+{{- define "poly.v3.container" }}
+{{- $root := get . "ctx" -}}
+{{- $appContainer := get . "appContainer" -}}
+{{- $mode := get . "mode" -}}
+name: {{ $appContainer.containerName | default (include "poly.v3.name" $root) }}
+image: "{{ $appContainer.image.repository | default $appContainer.quickConfigs.registry }}:{{ $appContainer.image.tag }}"
+imagePullPolicy: {{ $appContainer.image.pullPolicy }}
+{{- include "poly.v3.container.cmd" (dict "appContainer" $appContainer) }}
+ports: {{- include "poly.v3.container.ports" (dict "appContainer" $appContainer) | nindent 2 }}
+{{- with $appContainer.env }}
+env: {{- include "poly.v3.container.env" (dict "appContainer" $appContainer) | indent 2 }}
+{{- end -}}
+{{- with $appContainer.envFrom }}
+envFrom: {{- include "poly.v3.container.envFrom" (dict "appContainer" $appContainer) | nindent 2 }}
+{{- end -}}
+{{ $volumeMounts := (include "poly.v3.container.volumeMounts" (dict "appContainer" $appContainer)) | trimAll "\n" }}
+{{ if $volumeMounts }}
+volumeMounts: {{- $volumeMounts | nindent 2 }}
+{{- end }}
+resources: {{- toYaml $appContainer.resources | nindent 2 }}
+{{- if ne $mode "init" -}}
+{{ include "poly.v3.container.lifecycle" (dict "appContainer" $appContainer) }}
+{{- if $appContainer.probesOverride -}}
+{{ toYaml $appContainer.probesOverride }}
+{{- else -}}
+{{- $_ := set $appContainer.probes "healthcheckPath" $appContainer.quickConfigs.healthcheckPath -}}
+{{ include "poly.v3.container.probes" $appContainer.probes }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Container cmd section */}}
+{{- define "poly.v3.container.cmd" }}
+{{- $appContainer := get . "appContainer" -}}
+{{- $vault := $appContainer.vault -}} 
+{{- $cmd := ternary $vault.runContainer $appContainer $vault.enabled -}} 
+{{- with $cmd.command }}
+command: {{- toYaml . | nindent 2 }}
+{{- end -}}
+{{- with $cmd.runtimeArgs }}
+args: {{- toYaml . | nindent 2 }}
+{{- end -}}
+{{- end -}}
+
+{{/* Container ports section */}}
+{{- define "poly.v3.container.ports" }}
+{{- $appContainer := get . "appContainer" -}}
+{{- range $port := $appContainer.ports | default (list $appContainer.quickConfigs.port) }}
+{{- if kindIs "map" $port -}}
+- containerPort: {{ $port.containerPort }}
+  name: {{ $port.name | default "http" }}
+  protocol: {{ $port.protocol | default "TCP" }}
+  {{- with $port.hostIP }}
+  hostIP: {{ . }}
+  {{- end -}}
+  {{- with $port.hostPort }}
+  hostPort: {{ . }}
+  {{- end -}}
+{{- else -}}
+{{- $params := concat (without (mustRegexSplit ":" (. | toString) -1) "\"\"" "''") (list "" "") -}}
+- containerPort: {{ first $params }}
+  name: {{ index $params 1 | default "http" }}
+  protocol: {{ index $params 2 | default "TCP" }}
+{{ end }}
+{{- end }}
+{{- end -}}
+
+{{/* Container envFrom env */}}
+{{- define "poly.v3.container.env" }}
+{{- $appContainer := get . "appContainer" -}}
+{{- range $key, $val := $appContainer.env }}
+{{ $params := (mustRegexSplit ":" ($val | toString) -1)}}
+- name: {{ $key | quote }}
+{{ if not (has (first $params) ( list "cfm" "scr" "fr" "rfr")) }}
+  value: {{ $val | quote }}
+{{ else }}
+  valueFrom:
+  {{ if eq (first $params) "cfm" }}
+    configMapKeyRef:
+      key: {{ index $params 1 }}
+      name: {{ index $params 2 }}
+      optional: {{ eq (index $params 3) "true" }}
+  {{ else if eq (first $params) "scr" }}
+    secretKeyRef:
+      key: {{ index $params 1 }}
+      name: {{ index $params 2 }}
+      optional: {{ eq (index $params 3) "true" }}
+  {{ else if eq (first $params) "fr" }}
+    fieldRef:
+      fieldPath: {{ index $params 1 }}
+      apiVersion: {{ index $params 2 }}
+  {{ else }}
+    resourceFieldRef:
+      resource: {{ index $params 1 }}
+      containerName: {{ index $params 2 }}
+      divisor: {{ index $params 3 }}
+  {{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* Container envFrom section */}}
+{{- define "poly.v3.container.envFrom" }}
+{{ $envFrom := dict }}
+{{- $appContainer := get . "appContainer" -}}
+{{- range $val := $appContainer.envFrom }}
+{{ if kindIs "string" $val }}
+{{ $params := concat (without (mustRegexSplit ":" $val -1) "\"\"" "''") (list "") }}
+- {{ ternary "configMapRef" "secretRef" (eq (first $params) "cfm") }}:
+{{- $name := index $params 1 }}
+    name: {{ ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) }}
+    optional: {{ index $params 2 }}
+{{- with (index $params 3) }}
+  prefix: {{ . }}
+{{- end -}}
+{{ else }}
+{{ if hasKey $val "configMapRef" }}
+{{ $name := $val.configMapRef.name }}
+- configMapRef:
+    name: {{ ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) }}
+    optional: {{ $val.configMapRef.optional }}
+{{- else -}}
+{{ $name := $val.secretRef.name }}
+- secretRef:
+    name: {{ ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) }}
+    optional: {{ $val.secretRef.optional }}
+{{- end }}
+{{- with $val.prefix }}
+  prefix: {{ . }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Container lifecycle section */}}
+{{- define "poly.v3.container.lifecycle" }}
+{{- $appContainer := get . "appContainer" -}}
+{{ if $appContainer.lifecycleOverride }}
+lifecycle: {{ toYaml $appContainer.lifecycleOverride | nindent 2 }}
+{{ else if or $appContainer.lifecycle.postStart $appContainer.lifecycle.preStop }}
+lifecycle:
+{{ with $appContainer.lifecycle.postStart }}
+  postStart: {{ include "poly.v3.lifecycleHandler" . | nindent 4 }}
+{{ end }}
+{{ with $appContainer.lifecycle.preStop }}
+  preStop: {{ include "poly.v3.lifecycleHandler" . | nindent 4 }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{- define "poly.v3.lifecycleHandler" }}
+{{ with .execCommand }}
+exec:
+  command: {{ toYaml . | nindent 4 }}
+{{ end }}
+{{ with .httpGet }}
+{{ $params := concat (without (mustRegexSplit ":" .request -1) "\"\"" "''") (list "" "") }}
+httpGet:
+  path: {{ $.healthcheckPath | default (first $params) }}
+  port: {{ index $params 1 }}
+  {{ with index $params 2 }}
+  host: {{ . }}
+  {{ end }}
+  scheme: {{ index $params 3 | default "HTTP" }}
+  {{ with .httpHeaders }}
+  httpHeaders: {{ toYaml . | nindent 4 }}
+  {{ end }}
+{{ end }}
+{{ with .tcpSocket }}
+{{ $params := mustRegexSplit ":" . -1 }}
+tcpSocket:
+  host: {{ first $params }}
+  port: {{ index $params 1 }}
+{{ end }}
+{{ end }}
+
+{{/* Container probes section */}}
+{{- define "poly.v3.container.probes" }}
+{{- with .livenessProbe }}
+{{- $_ := set . "healthcheckPath" $.healthcheckPath }}
+livenessProbe: {{- include "poly.v3.probe" . | nindent 2 }}
+{{- end -}}
+{{- with .readinessProbe }}
+{{- $_ := set . "healthcheckPath" $.healthcheckPath }}
+readinessProbe: {{- include "poly.v3.probe" . | nindent 2 }}
+{{- end -}}
+{{- with .startupProbe }}
+{{- $_ := set . "healthcheckPath" $.healthcheckPath }}
+startupProbe: {{- include "poly.v3.probe" . | nindent 2 }}
+{{- end -}}
+{{- end -}}
+
+{{- define "poly.v3.probe" }}
+{{ include "poly.v3.lifecycleHandler" . }}
+{{ $params := (without (mustRegexSplit ":" .params -1) "\"\"" "''") }}
+initialDelaySeconds: {{ first $params | default 15 }}
+periodSeconds: {{ index $params 1 | default 15 }}
+timeoutSeconds: {{ index $params 2 | default 10 }}
+failureThreshold: {{ index $params 3 | default 30 }}
+successThreshold: {{ index $params 4 | default 1 }}
+{{- with .grpc }}
+grpc: {{- toYaml . | nindent 2 }}
+{{- end -}}
+{{ end }}
+
+{{/* Container volumeMounts section */}}
+{{- define "poly.v3.container.volumeMounts" }}
+{{- $appContainer := get . "appContainer" -}}
+{{- range $val := $appContainer.volumeMounts -}}
+{{- if kindIs "string" $val -}}
+{{- $params := concat (without (mustRegexSplit ":" $val -1) "\"\"" "''") (list "" "" "") }}
+- mountPath: {{ index $params 1 }}
+  name: {{ first $params }}
+  readOnly: {{ eq (index $params 2) "true" | default false }}
+  {{- with index $params 3 }}
+  subPath: {{ . }}
+  {{- end -}}
+  {{- with (index $params 4) }}
+  mountPropagation: {{ . }}
+  {{- end }}
+{{- else }}
+- mountPath: {{ .mountPath }}
+  name: {{ .name }}
+  readOnly: {{ .readOnly | default false }}
+  {{- with .subPath }}
+  subPath: {{ . }}
+  {{- end -}}
+  {{- with .mountPropagation }}
+  mountPropagation: {{ . }}
+  {{ end }}
+{{- end }}
+{{- end }}
+{{- range $pvc := $appContainer.pvcs }}
+{{- if $pvc.mountPath }}
+- mountPath: {{ $pvc.mountPath }}
+  name: {{ $pvc.name }}
+{{- end }}
+{{- end -}}
+{{- with $appContainer.customVolumeMounts }}
+{{ toYaml . }}
+{{- end -}}
+{{- end }}
