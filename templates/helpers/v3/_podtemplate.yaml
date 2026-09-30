@@ -132,13 +132,9 @@ args: {{- toYaml . | nindent 2 }}
   value: {{ $val | quote }}
 {{ else }}
   valueFrom:
-  {{ if eq (first $params) "cfm" }}
-    configMapKeyRef:
-      key: {{ index $params 1 }}
-      name: {{ index $params 2 }}
-      optional: {{ eq (index $params 3) "true" }}
-  {{ else if eq (first $params) "scr" }}
-    secretKeyRef:
+  {{ if has (first $params) (list "cfm" "scr") }}
+  {{/* [CHANGED 2] was: separate cfm / scr branches, identical except configMapKeyRef vs secretKeyRef */}}
+    {{ ternary "configMapKeyRef" "secretKeyRef" (eq (first $params) "cfm") }}:
       key: {{ index $params 1 }}
       name: {{ index $params 2 }}
       optional: {{ eq (index $params 3) "true" }}
@@ -233,17 +229,12 @@ tcpSocket:
 
 {{/* Container probes section */}}
 {{- define "poly.v3.container.probes" }}
-{{- with .livenessProbe }}
+{{- /* [CHANGED 1] was: 3 identical `with` blocks (liveness, readiness, startup). Now one loop, same order. */ -}}
+{{- range $name := list "livenessProbe" "readinessProbe" "startupProbe" }}
+{{- with get $ $name }}
 {{- $_ := set . "healthcheckPath" $.healthcheckPath }}
-livenessProbe: {{- include "poly.v3.probe" . | nindent 2 }}
+{{ $name }}: {{- include "poly.v3.probe" . | nindent 2 }}
 {{- end -}}
-{{- with .readinessProbe }}
-{{- $_ := set . "healthcheckPath" $.healthcheckPath }}
-readinessProbe: {{- include "poly.v3.probe" . | nindent 2 }}
-{{- end -}}
-{{- with .startupProbe }}
-{{- $_ := set . "healthcheckPath" $.healthcheckPath }}
-startupProbe: {{- include "poly.v3.probe" . | nindent 2 }}
 {{- end -}}
 {{- end -}}
 

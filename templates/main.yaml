@@ -19,23 +19,15 @@
 {{- end }}
 
 {{- /* Service resources */}}
-{{- $_ := set $.currentApp "currentSvc" $.currentApp.service -}}
-{{- include "poly.v3.service" $ -}}
-{{- range $svc := $.currentApp.service.extraServices }}
-{{- $_ := set $.currentApp "currentSvc" $svc -}}
-{{- include "poly.v3.service" $ -}}
-{{ end -}}
+{{- /* [CHANGED] was: set currentSvc + include + range extraServices (5 lines) */ -}}
+{{- include "poly.v3.renderWithExtras" (dict "ctx" $ "field" "currentSvc" "main" $.currentApp.service "extras" $.currentApp.service.extraServices "tpl" "poly.v3.service") -}}
 
 {{- /* SA resources */}}
 {{- include "poly.v3.sa" $ -}}
 
 {{- /* Ingress resources */}}
-{{- $_ := set $.currentApp "currentIngress" $.currentApp.ingress -}}
-{{- include "poly.v3.ingress" $ -}}
-{{- range $ing := $.currentApp.ingress.extraIngresses }}
-{{- $_ := set $.currentApp "currentIngress" $ing -}}
-{{- include "poly.v3.ingress" $ -}}
-{{- end -}}
+{{- /* [CHANGED] was: set currentIngress + include + range extraIngresses */ -}}
+{{- include "poly.v3.renderWithExtras" (dict "ctx" $ "field" "currentIngress" "main" $.currentApp.ingress "extras" $.currentApp.ingress.extraIngresses "tpl" "poly.v3.ingress") -}}
 
 {{- /* ConfigMap resources */}}
 {{- include "poly.v3.configmap" $ -}}
@@ -57,29 +49,17 @@
 
 {{- /* PodDisruptionBudget resources */}}
 {{- if ne $.currentApp.deployType "StatefulSet" -}}
-{{- $_ := set $.currentApp "currentPdb" $.currentApp.pdb -}}
-{{- include "poly.v3.pdb" $ -}}
-{{- range $pdb := $.currentApp.pdb.extraPdb }}
-{{- $_ := set $.currentApp "currentPdb" $pdb -}}
-{{- include "poly.v3.pdb" $ -}}
-{{- end -}}
+{{- /* [CHANGED] was: set currentPdb + include + range extraPdb */ -}}
+{{- include "poly.v3.renderWithExtras" (dict "ctx" $ "field" "currentPdb" "main" $.currentApp.pdb "extras" $.currentApp.pdb.extraPdb "tpl" "poly.v3.pdb") -}}
 {{- end -}}
 
 {{- /* Istio VirtualService resources */}}
-{{- $_ := set $.currentApp "currentVS" $.currentApp.istio.virtualservice -}}
-{{- include "poly.v3.virtualservice" $ -}}
-{{- range $vs := $.currentApp.istio.virtualservice.extraVS }}
-{{- $_ := set $.currentApp "currentVS" $vs -}}
-{{- include "poly.v3.virtualservice" $ -}}
-{{- end -}}
+{{- /* [CHANGED] was: set currentVS + include + range extraVS */ -}}
+{{- include "poly.v3.renderWithExtras" (dict "ctx" $ "field" "currentVS" "main" $.currentApp.istio.virtualservice "extras" $.currentApp.istio.virtualservice.extraVS "tpl" "poly.v3.virtualservice") -}}
 
 {{- /* Istio Gateway resources */}}
-{{- $_ := set $.currentApp "currentGateway" $.currentApp.istio.gateway -}}
-{{- include "poly.v3.gateway" $ -}}
-{{- range $gw := $.currentApp.istio.gateway.extraGW }}
-{{- $_ := set $.currentApp "currentGateway" $gw -}}
-{{- include "poly.v3.gateway" $ -}}
-{{- end -}}
+{{- /* [CHANGED] was: set currentGateway + include + range extraGW */ -}}
+{{- include "poly.v3.renderWithExtras" (dict "ctx" $ "field" "currentGateway" "main" $.currentApp.istio.gateway "extras" $.currentApp.istio.gateway.extraGW "tpl" "poly.v3.gateway") -}}
 
 {{- /* Rollout dynamic configmap */}}
 {{- end -}}
