@@ -68,6 +68,14 @@ Render key-value datatype, also support value as template
 {{- end -}}
 {{- end -}}
 
+{{- /* [CHANGED 6]: new helper — gom replicas logic trùng giữa deployment & statefulset */ -}}
+{{- define "poly.v3.replicas" -}}
+{{- $app := $.currentApp -}}
+{{- if not $app.autoscaling.enabled -}}
+replicas: {{ if $app.rollout.enabled }}{{ 0 }}{{ else }}{{ $app.replicas }}{{ end }}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Render probes in pod template for healthcheck
 */}}

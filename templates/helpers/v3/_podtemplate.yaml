@@ -154,7 +154,7 @@ args: {{- toYaml . | nindent 2 }}
 
 {{/* Container envFrom section */}}
 {{- define "poly.v3.container.envFrom" }}
-{{ $envFrom := dict }}
+{{- /* [CHANGED 5]: removed unused $envFrom := dict */ -}}
 {{- $appContainer := get . "appContainer" -}}
 {{- range $val := $appContainer.envFrom }}
 {{ if kindIs "string" $val }}
@@ -167,17 +167,13 @@ args: {{- toYaml . | nindent 2 }}
   prefix: {{ . }}
 {{- end -}}
 {{ else }}
-{{ if hasKey $val "configMapRef" }}
-{{ $name := $val.configMapRef.name }}
-- configMapRef:
+{{- /* [CHANGED 5]: was separate configMapRef/secretRef blocks with identical logic, now merged with ternary */ -}}
+{{- $refType := ternary "configMapRef" "secretRef" (hasKey $val "configMapRef") -}}
+{{- $ref := get $val $refType -}}
+{{- $name := $ref.name }}
+- {{ $refType }}:
     name: {{ ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) }}
-    optional: {{ $val.configMapRef.optional }}
-{{- else -}}
-{{ $name := $val.secretRef.name }}
-- secretRef:
-    name: {{ ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) }}
-    optional: {{ $val.secretRef.optional }}
-{{- end }}
+    optional: {{ $ref.optional }}
 {{- with $val.prefix }}
   prefix: {{ . }}
 {{- end -}}

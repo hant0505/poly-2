@@ -23,26 +23,19 @@ spec:
     scaleDown: {{- include "poly.v3.hpa.scalingRule" $hpa.behavior.scaleDown | nindent 6 }}
     scaleUp: {{- include "poly.v3.hpa.scalingRule" $hpa.behavior.scaleUp | nindent 6 }}
   {{- end }}
+  {{- /* [CHANGED 4]: was 2 separate identical metrics blocks (memory & cpu), now 1 range loop */}}
   metrics:
+    {{- range $metric := list (list "memory" $hpa.targetMemoryUtilizationPercentage) (list "cpu" $hpa.targetCPUUtilizationPercentage) }}
     - type: Resource
       resource:
-        name: memory
+        name: {{ index $metric 0 }}
         {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version }}
         target:
           type: Utilization
-          averageUtilization: {{ $hpa.targetMemoryUtilizationPercentage }}
+          averageUtilization: {{ index $metric 1 }}
         {{- else }}
-        targetAverageUtilization: {{ $hpa.targetMemoryUtilizationPercentage }}
+        targetAverageUtilization: {{ index $metric 1 }}
         {{- end }}
-    - type: Resource
-      resource:
-        name: cpu
-        {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.Version }}
-        target:
-          type: Utilization
-          averageUtilization: {{ $hpa.targetCPUUtilizationPercentage }}
-        {{- else }}
-        targetAverageUtilization: {{ $hpa.targetCPUUtilizationPercentage }}
-        {{- end }}
+    {{- end }}
 {{- end -}}
 {{- end -}}

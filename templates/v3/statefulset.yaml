@@ -9,8 +9,7 @@ spec:
   selector: {{- include "poly.v3.labelSelector" $ | nindent 4 }}
   template: {{- include "poly.v3.podTemplate" $ | nindent 4 }}
   updateStrategy: {{- include "poly.v3.updateStrategy" $ | nindent 4 }}
-  {{- if not $app.autoscaling.enabled }}
-  replicas: {{ if $app.rollout.enabled }}{{ 0 }}{{ else }}{{ $app.replicas }}{{ end }}
-  {{- end }}
+  {{- /* [CHANGED 8]: was inline replicas logic, now uses shared helper */ -}}
+  {{- include "poly.v3.replicas" $ | nindent 2 }}
   {{- with $.currentApp.workloadCommonConfigs.statefulset -}}{{- toYaml . | nindent 2 }}{{- end -}}
 {{ end }}
