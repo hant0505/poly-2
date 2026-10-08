@@ -1,0 +1,25 @@
+# Patterns to ignore when packaging a chart.
+.DS_Store
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Packages and archives
+*.tgz
+*.tar.gz
+*.zip
+
+# Dev and test values & manifests in root
+values-*.yaml
+/res*.yaml
+/after.yaml
+/save*.yaml
+
+# Local markdown reports
+learn.md
+optimization-report.md
+
+# Local backup and comparison directories
+poly-3.0.4-old/
+backup_files/

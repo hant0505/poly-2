@@ -63,13 +63,13 @@ default:
       # suspend: false
       # timezone: Asia/Bangkok
     job:
-      parallelism: 0
-      completions: 0
-      completionMode: NonIndexed
+      # parallelism: 0
+      # completions: 0
+      # completionMode: NonIndexed
       backoffLimit: 6
-      activeDeadlineSeconds: 0
-      ttlSecondsAfterFinished: 0
-      suspend: false
+      # activeDeadlineSeconds: 0
+      # ttlSecondsAfterFinished: 0
+      # suspend: false
     rollout:
       analysis:
         successfulRunHistoryLimit: 5
@@ -174,9 +174,9 @@ default:
   # Provide Pod lifecycle config
   # More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle
   # API: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#lifecycle
-  podLifecycle: {}
-    # restartPolicy: "Always"
+  podLifecycle:
     # terminationGracePeriodSeconds: 30
+    # restartPolicy: "Always"
     # activeDeadlineSeconds: 10
   
   podExtraConfigs: {}
@@ -217,10 +217,10 @@ default:
   #       httpHeaders:
   #         - name: Content-Type
   #           value: application/json
-  #     execCommand: ["sleep", "30"]
+  #     execCommand: ["sleep", "10"]
   #     tcpSocket: host:8080
   #
-  #     params: "15:15:10:30:1" # initialDelaySeconds:periodSeconds:timeoutSeconds:failureThreshold:successThreshold
+  #     params: "15:15:10:3:1" # initialDelaySeconds:periodSeconds:timeoutSeconds:failureThreshold:successThreshold
   #     grpc:
   #       port: 8080
   #       service: service-name
@@ -228,7 +228,7 @@ default:
     livenessProbe:
       httpGet:
         request: /:http
-      params: "15:15:10:30:1"
+      params: "15:15:10:3:1"
     readinessProbe:
       httpGet:
         request: /:http
@@ -251,7 +251,7 @@ default:
       #       value: 
       # tcpSocket: host:8080
     preStop:
-      execCommand: ["sleep", "30"]
+      execCommand: ["sleep", "10"]
   lifecycleOverride: {}
 
   # Provide resources, format in example below, must have

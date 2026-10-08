@@ -240,7 +240,7 @@ tcpSocket:
 initialDelaySeconds: {{ first $params | default 15 }}
 periodSeconds: {{ index $params 1 | default 15 }}
 timeoutSeconds: {{ index $params 2 | default 10 }}
-failureThreshold: {{ index $params 3 | default 30 }}
+failureThreshold: {{ index $params 3 | default 3 }}
 successThreshold: {{ index $params 4 | default 1 }}
 {{- with .grpc }}
 grpc: {{- toYaml . | nindent 2 }}
