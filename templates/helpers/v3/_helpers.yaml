@@ -158,13 +158,38 @@ name: {{ include "poly.v3.fullname" $ }}
 labels: {{- include "poly.v3.labels" $ | nindent 2 }}
 {{- end -}}
 
-{{/* Render updateStrategy for Depolyment & DaemonSet */}}
+{{/* Render updateStrategy for Deployment & DaemonSet */}}
 {{- define "poly.v3.updateStrategy" -}}
 {{- $params := concat (without (mustRegexSplit ":" $.currentApp.strategy -1) "\"\"" "''") (list "" "") -}}
-type: {{ first $params }}
+{{- $type := first $params | default "RollingUpdate" -}}
+type: {{ $type }}
+{{- if eq $type "RollingUpdate" }}
 rollingUpdate:
   maxSurge: {{ index $params 1 | default "25%" }}
   maxUnavailable: {{ index $params 2 | default "25%" }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  Render updateStrategy specifically for StatefulSet [CHANGED 9]
+  - StatefulSet spec KHÔNG CÓ maxSurge, chỉ có maxUnavailable và partition.
+  - Convention: RollingUpdate:<maxUnavailable>:<partition>
+  - Nếu kế thừa default "RollingUpdate:25%:25%", param 1 là maxUnavailable (25%), param 2 là partition ("25%").
+    Do partition bắt buộc là số nguyên int (không nhận %), helper sẽ tự động bỏ qua partition và K8s dùng default 0.
+*/}}
+{{- define "poly.v3.statefulset.updateStrategy" -}}
+{{- $params := concat (without (mustRegexSplit ":" $.currentApp.strategy -1) "\"\"" "''") (list "" "") -}}
+{{- $type := first $params | default "RollingUpdate" -}}
+{{- $maxUnavail := index $params 1 | default "25%" -}}
+{{- $partition := index $params 2 -}}
+type: {{ $type }}
+{{- if eq $type "RollingUpdate" }}
+rollingUpdate:
+  maxUnavailable: {{ $maxUnavail }}
+  {{- if and $partition (not (hasSuffix "%" $partition)) }}
+  partition: {{ $partition | int }}
+  {{- end }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -249,4 +274,17 @@ Render ingress.path section.
 {{- define "poly.v3.prefixName" }}
 {{- $name := get . "prefixName" -}}
 {{- ternary (printf "%s%s" $.Release.Name $name) $name (hasPrefix "-" $name) -}}
+{{- end -}}
+
+{{/* Render main resource and its extra configurations | Params: ctx ($), field, main, extras, tpl */}}
+{{- define "poly.v3.renderWithExtras" -}}
+{{- $root := get . "ctx" -}}
+{{- $field := get . "field" -}}       
+{{- $tpl := get . "tpl" -}} 
+{{- $_ := set $root.currentApp $field (get . "main") -}}
+{{- include $tpl $root -}}
+{{- range $extra := get . "extras" }}
+{{- $_ := set $root.currentApp $field $extra -}}
+{{- include $tpl $root -}}
+{{- end -}}
 {{- end -}}

@@ -22,6 +22,11 @@ default:
 
   # Choose update strategy for your app
   # Values: RollingUpdate | Recreate | OnDelete
+  #
+  # - Deployment  → RollingUpdate:<maxSurge>:<maxUnavailable>   
+  # - DaemonSet   → RollingUpdate:<maxSurge>:<maxUnavailable>  
+  # - StatefulSet → RollingUpdate:<maxUnavailable>:<partition> 
+  
   strategy: RollingUpdate:25%:25%
 
   quickConfigs:
